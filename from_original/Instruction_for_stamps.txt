@@ -1,0 +1,60 @@
+***In IRAF:***
+
+0. Use imcombine to sum the original images of different filters.
+   e.g. imcombine @sect23.lis sect23_sum
+
+1. Use imcopy to cut the mask stamp from the combined image.
+   e.g. imcopy sect23_sum.fits[2891:3090,7771:7940] stamp/sect23_sum_gal1_mask.fits
+
+2. Use imstat to calculate sigma(STDDEV) for the mask stamp.
+   e.g. imstat sect23_sum_gal1_mask.fits
+
+3. Determine a threshold (e.g. < 1 sigma); use imreplace to set all the pixels under the threshold as 0 and others 1 in the mask stamp.
+   e.g. imreplace sect23_sum_gal1_mask.fits 0.0 lower=INDEF upper=0.01
+        imreplace sect23_sum_gal1_mask.fits 1.0 lower=0.01 upper=INDEF
+
+4. Clean minor galaxies or bright spots in the mask stamp.
+   e.g. imreplace sect23_sum_gal1_mask.fits[1:10,2:20] 0.0
+
+Now we have the mask stamp for one galaxy.
+
+5. Cut the same area from one filter image.
+   e.g. imcopy sect23_f606w.fits[2891:3090,7771:7940] stamp/gal1_606.fits
+
+6. Use imarith to generate the galaxy image after masking.
+   e.g. imarith gal1_606.fits * sect23_sum_gal1_mask.fits sect23_f606w_gal1.fits
+
+7. Repeat step 5-6 for other filters.
+
+8. Repeat step 1-7 for other galaxies.
+
+9. To edit the header of the stamp, use eheader(from STSDAS pkg) or hedit.
+
+   9.1 Installing STSDAS package under IRAF2.15 or later:
+       cd /iraf/iraf/extern/
+       sudo ./configure
+       sudo make check
+       sudo make tables stsdas
+       sudo make update
+
+
+***In SourceExtractor:***
+
+1. Uncomment FLUX_BEST, MAG_BEST, FLUX_RADIUS in default.param file.
+
+2. In default.sex file, set as:
+   ...
+   DETECT_MINAREA    10
+   THRESH_TYPE       RELATIVE      ## default value
+   DETECT_THRESH     0.001         ## set a low threshold
+   ANALYSIS_THRESH   2
+   PHOT_FLUXFRAC     0.5           ## default as 50% flux radius
+   ...
+   DEBLEND_NTHRESH   1             ## set as 1 such that fewer objects are extracted
+   MAG_ZEROPOINT                   ## calculate this value using ZEROPT=-2.5*lg(PHOTFLAM)+PHOTZPT, where PHOTFLAM & PHOTZPT can be found in the header of each filter image; 26.66110(f606w), 26.78212(f814w), 28.03741(f125w)
+   ...
+
+3. Run SourceExtractor on each stamp, and record the FLUX, MAG and RADIUS.
+   e.g. sex sect23_f606_gal1.fits
+
+4. Write FLUX, MAG and RADIUS to the header of the stamp. 
